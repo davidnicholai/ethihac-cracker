@@ -8,25 +8,39 @@ import java.util.List;
 
 public class pwdcrckr {
 
-    private String FILEPATH_WORST_PASSWORDS = getClass().getResource("500-worst-passwords.txt").getPath();
-    private String FILEPATH_PASSWD = getClass().getResource("passwd.txt").getPath();
-    private String FILEPATH_SHADOW = getClass().getResource("shadow.txt").getPath();
-    private static String LINE_SEPARATOR = "\r\n";
-    private static String USERINFO_SEPARATOR = ":";
+    private final String FILEPATH_WORST_PASSWORDS = getClass().getResource("500-worst-passwords.txt").getPath();
+    private final String FILEPATH_PASSWD = getClass().getResource("passwd.txt").getPath();
+    private final String FILEPATH_SHADOW = getClass().getResource("shadow.txt").getPath();
+    private final static String LINE_SEPARATOR = "\r\n";
+    private final static String USERINFO_SEPARATOR = ":";
 
     private String[] worstPasswords;
-    private List<User> users = new ArrayList<>();
+    private final List<User> users = new ArrayList<>();
+
+    private File fileOutput;
 
     public static void main(String[] args) {
+        System.out.println("Starting now");
+        final long startTime = System.currentTimeMillis();
+
         pwdcrckr pwdcrckr = new pwdcrckr();
         try {
             pwdcrckr.getWorstPasswords();
             pwdcrckr.getUsers();
             pwdcrckr.getPasswords();
             pwdcrckr.performCracking();
+            pwdcrckr.displayResults();
         } catch (Exception e) {
             e.printStackTrace();
         }
+
+        final long duration = System.currentTimeMillis() - startTime;
+        System.out.println("Execution time: " + (duration / 1000) + " seconds");
+
+    }
+
+    private pwdcrckr() {
+        fileOutput = new File("./results.txt");
     }
 
     private void getWorstPasswords() throws IOException {
@@ -60,11 +74,7 @@ public class pwdcrckr {
         for (String tempShadow : tempShadows) {
             String[] fields = tempShadow.split(USERINFO_SEPARATOR);
 
-            for (int i = 0; i < users.size(); i++) {
-                if (users.get(i).username.equals(fields[0])) {
-                    users.get(i).password = fields[1];
-                }
-            }
+            users.stream().filter(user -> user.username.equals(fields[0])).forEach(user -> user.password = fields[1]);
         }
     }
 
@@ -73,20 +83,36 @@ public class pwdcrckr {
             for (String worstPassword : worstPasswords) {
                 if (user.password.length() > 1) {
                     if (Sha512Crypt.verifyPassword(worstPassword, user.password)) {
-                        System.out.println("Found a password for " + user.username + " : " + worstPassword);
+                        // System.out.println("Found a password for " + user.username + " : " + worstPassword);
+                        user.crackedPassword = worstPassword;
+                        break;
                     }
-
                 }
             }
         }
     }
 
-    private class User {
-        public String username = "";
-        public int userId;
-        public String password = "";
+    private void displayResults() throws IOException {
+        System.out.println("===== PASSWORD CRACKER RESULTS =====");
+        String all = "";
+        for (User user : users) {
+            if (!user.crackedPassword.isEmpty()) {
+                String result = "User ID: " + user.userId + " / Username: " + user.username + " / Password: " + user.crackedPassword;
+                System.out.println(result);
+                all += result + LINE_SEPARATOR;
+            }
+        }
+        System.out.println("=====      END OF RESULTS      =====");
+
+        FileUtils.writeStringToFile(fileOutput, all, Charsets.UTF_8, false);
+        // the false means don't append to current file
     }
 
-
+    private class User {
+        private String username = "";
+        private int userId = -1;
+        private String password = "";
+        private String crackedPassword = "";
+    }
 
 }
